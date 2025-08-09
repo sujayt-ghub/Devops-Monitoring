@@ -238,8 +238,9 @@ copy paste file data prometheus-alert.yaml from global to end line and paste it 
 
 also configure mail id details
 
+for slack id config instead of mail then copy the details from the slackalert.yaml file and replace with global section details 
 
-
+---------------------------------------------
 after pwd update 
 kubectl delete pod prometheus-alertmanager-0 and will recreate
 
