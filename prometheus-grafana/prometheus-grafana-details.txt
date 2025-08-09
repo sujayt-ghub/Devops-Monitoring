@@ -1,0 +1,248 @@
+vibe code test description
+
+i am working on building a framework to spine up infra on aws cloud using pythom boto3, i want you to setup initial framework and we will work towards adding scripts for individual cloud resources later
+
+---------------
+
+
+kube-prometheus-stack has been installed. Check its status by running:
+  kubectl --namespace monitoring get pods -l "release=monitoring"
+
+Get Grafana 'admin' user password by running:
+
+  kubectl --namespace monitoring get secrets monitoring-grafana -o jsonpath="{.data.admin-password}" | base64 -d ; echo
+
+Access Grafana local instance:
+
+  export POD_NAME=$(kubectl --namespace monitoring get pod -l "app.kubernetes.io/name=grafana,app.kubernetes.io/instance=monitoring" -oname)
+  kubectl --namespace monitoring port-forward $POD_NAME 3000
+
+Visit https://github.com/prometheus-operator/kube-prometheus for instructions on how to create & configure Alertmanager and Prometheus instances using the Operator.
+
+
+
+https://github.com/prometheus-community/helm-charts/blob/main/charts/kube-prometheus-stack/README.md
+-----------------------------------------------------------------
+
+
+abishek veeramalla notes
+
+https://github.com/iam-veeramalla/observability-Zero-To-Hero
+
+helm commands
+
+helm repo list
+
+helm repo update
+helm install prometheus prometheus-community/prometheus
+
+sujay@sujay-VirtualBox:~$ helm install prometheus prometheus-community/prometheus
+NAME: prometheus
+LAST DEPLOYED: Wed Aug  6 20:07:52 2025
+NAMESPACE: default
+STATUS: deployed
+REVISION: 1
+TEST SUITE: None
+NOTES:
+The Prometheus server can be accessed via port 80 on the following DNS name from within your cluster:
+prometheus-server.default.svc.cluster.local
+
+
+Get the Prometheus server URL by running these commands in the same shell:
+  export POD_NAME=$(kubectl get pods --namespace default -l "app.kubernetes.io/name=prometheus,app.kubernetes.io/instance=prometheus" -o jsonpath="{.items[0].metadata.name}")
+  kubectl --namespace default port-forward $POD_NAME 9090
+
+
+The Prometheus alertmanager can be accessed via port 9093 on the following DNS name from within your cluster:
+prometheus-alertmanager.default.svc.cluster.local
+
+
+Get the Alertmanager URL by running these commands in the same shell:
+  export POD_NAME=$(kubectl get pods --namespace default -l "app.kubernetes.io/name=alertmanager,app.kubernetes.io/instance=prometheus" -o jsonpath="{.items[0].metadata.name}")
+  kubectl --namespace default port-forward $POD_NAME 9093
+#################################################################################
+######   WARNING: Pod Security Policy has been disabled by default since    #####
+######            it deprecated after k8s 1.25+. use                        #####
+######            (index .Values "prometheus-node-exporter" "rbac"          #####
+###### .          "pspEnabled") with (index .Values                         #####
+######            "prometheus-node-exporter" "rbac" "pspAnnotations")       #####
+######            in case you still need it.                                #####
+#################################################################################
+
+
+The Prometheus PushGateway can be accessed via port 9091 on the following DNS name from within your cluster:
+prometheus-prometheus-pushgateway.default.svc.cluster.local
+
+
+Get the PushGateway URL by running these commands in the same shell:
+  export POD_NAME=$(kubectl get pods --namespace default -l "app=prometheus-pushgateway,component=pushgateway" -o jsonpath="{.items[0].metadata.name}")
+  kubectl --namespace default port-forward $POD_NAME 9091
+
+
+-----------
+kubectl get pods
+kubectl get svc
+expose prometheus-server  to NodePort
+kubectl expose service prometheus-server --type=NodePort --target-port=9090 --name=prometheus-server-ext
+new entry with service name prometheus-server-ext  can be seen in - kubectl get svc
+minikube ip and prometheus-server-ext port to access prometheus
+ex, 192.168.49.2:32456
+
+
+-----------
+helm repo add grafana https://grafana.github.io/helm-charts
+
+You can then run helm search repo grafana to see the charts.
+helm repo update
+helm install grafana grafana/grafana
+
+------------------------
+
+sujay@sujay-VirtualBox:~$ helm install grafana grafana/grafana
+NAME: grafana
+LAST DEPLOYED: Wed Aug  6 20:31:12 2025
+NAMESPACE: default
+STATUS: deployed
+REVISION: 1
+NOTES:
+1. Get your 'admin' user password by running:
+
+   kubectl get secret --namespace default grafana -o jsonpath="{.data.admin-password}" | base64 --decode ; echo
+
+
+2. The Grafana server can be accessed via port 80 on the following DNS name from within your cluster:
+
+   grafana.default.svc.cluster.local
+
+   Get the Grafana URL to visit by running these commands in the same shell:
+     export POD_NAME=$(kubectl get pods --namespace default -l "app.kubernetes.io/name=grafana,app.kubernetes.io/instance=grafana" -o jsonpath="{.items[0].metadata.name}")
+     kubectl --namespace default port-forward $POD_NAME 3000
+
+3. Login with the password from step 1 and the username: admin
+#################################################################################
+######   WARNING: Persistence is disabled!!! You will lose your data when   #####
+######            the Grafana pod is terminated.                            #####
+##########################################
+ grafana passwd
+
+kubectl get secret --namespace default grafana -o jsonpath="{.data.admin-password}" | base64 --decode ; echo
+
+grafana pwd
+
+
+expose grafana service to nodeport
+
+kubectl expose service grafana --type=NodePort --target-port=3000 --name=grafana-ext
+
+ex, 192.168.49.2:32316
+
+login to grafana username admin and pwd check above
+once login click on add your first data source
+select prometheus as data source
+and in prometheus server URL add prometheus svc url ex, 192.168.49.2:32456
+and click and save and test
+
+then come to dashboard and import dashboard with id 3662 and under prometheus drop list select prometheus data source
+and click on import
+--------------------------------
+expose prometheus-kube-state-metrics service to nodeport
+
+kubectl expose service prometheus-kube-state-metrics --type=NodePort --target-port=8080 --name=prometheus-kube-state-metrics-ext
+
+192.168.49.2:30416
+192.168.49.2:30416/metrics
+
+----------------
+
+kubectl get cm
+kubectl edit cm prometheus-server
+
+add a new job name under 
+  scrape_configs:
+    - job_name: prometheus
+      static_configs:
+      - targets:
+        - localhost:9090
+    - job_name: state_metrics
+      static_configs:
+      - targets:
+        - 192.168.49.2:30416/metrics
+    - job_name: node exporter
+      static_configs:
+      - targets:
+        - 192.168.49.2:30985/metrics
+----------------------------------------
+
+at time of working updated with below details
+
+    scrape_configs:
+    - job_name: prometheus
+      static_configs:
+        - targets: ['192.168.49.2:31070','192.168.49.2:30210']
+
+
+9100:30985 for node exporter, 8080:30416 for kube-state-metrics
+--------------------------------------------------------------------------
+
+      
+kubectl expose service prometheus-prometheus-node-exporter --type=NodePort --target-port=9100 --name=prometheus-prometheus-node-exporter-ext
+
+
+kubenetes pod overview grafana id 6781
+
+
+kubectl restart command
+
+kubectl rollout restart deployment/my-app
+https://stackify.com/how-to-restart-a-kubernetes-pod-using-kubectl/
+---------------------------------------------------------
+
+aug 8 
+conitunue with prometheus
+test app
+
+kubectl run busybox-crash --image=busybox -- /bin/sh -c "exit 1"
+
+
+grafana kubernetes dashboard ids 6417, 6781
+
+-------------------------------------
+
+EFK Stack
+
+
+https://github.com/iQuantC/Filebeat-Elasticsearch-Kibana-Kubernetes
+
+
+elatic port 9200
+elastic username elastic
+elastic pwd changeme
+---------------------------------------------------------------------
+configure Prometheus alert manager and rules
+
+kubectl expose service prometheus-alertmanager --type=NodePort --target-port=9093 --name=prometheus-alertmanager-ext
+
+
+ - /etc/config/recording_rules.yml
+    - /etc/config/alerting_rules.yml
+    - /etc/config/rules
+    - /etc/config/alerts
+
+ git clone https://github.com/DinmaMerciBoi/Prometheus-Alertmanager-Grafana
+
+helm install prometheus prometheus-community/prometheus -f prometheus.yaml
+helm upgrade prometheus prometheus-community/prometheus -f prometheus.yaml
+
+kubectl edit cm prometheus-alertmanager
+copy paste file data prometheus-alert.yaml from global to end line and paste it in kubectl edit cm prometheus-alertmanager , in under replace with global section without deleting config and other details
+
+also configure mail id details
+
+
+
+after pwd update 
+kubectl delete pod prometheus-alertmanager-0 and will recreate
+
+check if config is set correct and alert mail started receiving every 2 mins per current settings.
+
+
